@@ -569,7 +569,7 @@ class Module(object):
                     load(child, prefix + name + '.')
 
         load(self)
-        del load
+        del state_dict
 
         if strict:
             if len(unexpected_keys) > 0:

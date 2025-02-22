@@ -347,6 +347,12 @@ PyObject* PyTensor_data(PyTensor* self) {
   HT_PY_FUNC_END
 }
 
+PyObject* PyTensor_raw_data_ptr(PyTensor* self) {
+  HT_PY_FUNC_BEGIN
+  return PyLong_FromInteger(int64_t(self->tensor->get_raw_data_ptr()));
+  HT_PY_FUNC_END
+}
+
 PyObject* PyTensor_graph(PyTensor* self) {
   HT_PY_FUNC_BEGIN
   return PyGraph_New(self->tensor->graph_id());
@@ -679,6 +685,7 @@ std::vector<PyMethodDef> InitTensorPyMethodDefs() {
     {"to", (PyCFunction) PyTensor_data_transfer, METH_VARARGS | METH_KEYWORDS, nullptr },
     {"reset_data", (PyCFunction) PyTensor_reset_data, METH_VARARGS | METH_KEYWORDS, nullptr },
     {"get_data", (PyCFunction) PyTensor_get_data, METH_VARARGS | METH_KEYWORDS, nullptr },
+    {"raw_data_ptr", (PyCFunction) PyTensor_raw_data_ptr, METH_VARARGS | METH_KEYWORDS, nullptr },
     {"get_device_group_union", (PyCFunction) PyTensor_get_device_group_union, METH_VARARGS | METH_KEYWORDS, nullptr },
     {"check_ds_hierarchy_equal", (PyCFunction) PyTensor_check_ds_hierarchy_equal, METH_VARARGS | METH_KEYWORDS, nullptr },
     {"check_ds_hierarchy_equal_except_split", (PyCFunction) PyTensor_check_ds_hierarchy_equal_except_split, METH_VARARGS | METH_KEYWORDS, nullptr },
