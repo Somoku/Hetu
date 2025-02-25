@@ -11,7 +11,7 @@ from hetu.models.utils.config_utils import PreTrainedConfig
 from hetu.models.utils import SAFE_WEIGHTS_NAME, SAFE_WEIGHTS_INDEX_NAME, TORCH_WEIGHTS_NAME, TORCH_WEIGHTS_INDEX_NAME
 from hetu.models.utils.hub import is_remote_url
 from hetu.utils.checkpoint.ht_safetensors import load_file
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Optional, Union
 
 def _add_variant(weights_name: str, variant: Optional[str] = None) -> str:
     if variant is not None:
@@ -540,3 +540,5 @@ class PreTrainedModel(ht.nn.Module):
             )
         
         return model, missing_keys, unexpected_keys, mismatched_keys, error_msgs
+
+__all__ = ["PreTrainedModel"]

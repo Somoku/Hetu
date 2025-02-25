@@ -252,10 +252,6 @@ class LlamaBlock(ht.nn.Module):
 class LlamaPreTrainedModel(PreTrainedModel):
     config_class = LlamaConfig
     base_model_prefix = "model"
-    
-    def _init_weights(self, module):
-        # TODO: init weights
-        pass
 
 class LlamaModel(LlamaPreTrainedModel):
     def __init__(self, config: LlamaConfig, ds_parallel_configs):
@@ -310,10 +306,10 @@ class LlamaModel(LlamaPreTrainedModel):
         hidden_states = self.rmsnorm_f(hidden_states)
         return hidden_states
 
-class LlamaForCausalLM(LlamaPreTrainedModel):
+class LlamaLMHeadModel(LlamaPreTrainedModel):
 
     def __init__(self, config: LlamaConfig, ds_parallel_configs):
-        super(LlamaForCausalLM, self).__init__()
+        super(LlamaLMHeadModel, self).__init__()
         self.config = config
         self.ds_parallel_configs = ds_parallel_configs
 
@@ -352,3 +348,5 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
                 labels, ignored_index = -1, reduction = "mean")
 
         return loss
+
+__all__ = ["LlamaLMHeadModel"]

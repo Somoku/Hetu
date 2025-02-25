@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Union
 from hetu.models.utils.hub import is_remote_url
 from hetu.models.utils import CONFIG_NAME
 
@@ -100,3 +100,5 @@ class PreTrainedConfig(object):
         for key, value in config_dict.items():
             setattr(self, key, value)
         return self
+
+__all__ = ["PreTrainedConfig"]
