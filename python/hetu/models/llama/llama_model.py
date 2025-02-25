@@ -51,7 +51,7 @@ class LlamaAttention(ht.nn.Module):
             config.num_attention_heads * self.head_dim,
             config.hidden_size,
             get_multi_ds_parallel_config(ds_parallel_configs, 'dense', layer_idx),
-            sp=True,
+            sequence_parallel=True,
             bias=config.attention_bias,
             name=f'rowp_{name}'
         )
@@ -150,11 +150,9 @@ class LlamaAttention(ht.nn.Module):
         attn_output = self.dense(attn_output)
         return attn_output
 
-
-
-class ParallelMLP(ht.nn.Module):
+class LlamaMLP(ht.nn.Module):
     def __init__(self, config, ds_parallel_configs, layer_idx, name='mlp'):
-        super(ParallelMLP, self).__init__()
+        super(LlamaMLP, self).__init__()
         
         self.config = config
         self.ds_parallel_configs = ds_parallel_configs
@@ -183,6 +181,8 @@ class ParallelMLP(ht.nn.Module):
         )
 
     def forward(self, hidden_states):
+        origin_shape = hidden_states.global_shape # [b * seq_len, hidden_size]
+        assert len(origin_shape) == 2, "sequence parallel: all is 2 dim matmul"
         # [b*seq_len, h] -> [b*seq_len, 4h]
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
         # intermediate_parallel = self.activation_func(intermediate_parallel)
@@ -200,22 +200,9 @@ class ParallelMLP(ht.nn.Module):
         output = self.dense_4h_to_h(intermediate_parallel)
         return output
 
-class LlamaMLP(ht.nn.Module):
-    def __init__(self, config: LlamaConfig, ds_parallel_configs, layer_idx, name='mlp'):
-        super(LlamaMLP, self).__init__()
-        self.config = config
-        self.ds_parallel_configs = ds_parallel_configs
-        self.parallel_mlp = ParallelMLP(config, ds_parallel_configs, layer_idx, name)
-
-    def forward(self, hidden_states):
-        origin_shape = hidden_states.global_shape # [b * seq_len, hidden_size]
-        assert len(origin_shape) == 2, "sequence parallel: all is 2 dim matmul"
-        hidden_states = self.parallel_mlp(hidden_states)
-        return hidden_states
-
 class LlamaBlock(ht.nn.Module):
     def __init__(self, config: LlamaConfig, ds_parallel_configs, layer_idx):
-        super().__init__()
+        super(LlamaBlock, self).__init__()
         self.config = config
         self.ds_parallel_configs = ds_parallel_configs
         self.layer_idx = layer_idx
