@@ -9,28 +9,36 @@ class PreTrainedTokenizer(object):
     pattern: str = None
     special_tokens: List[str] = None
     
-    def __init__(self):
-        self._tokenizer = None
+    def __init__(self, **kwargs):
+        self._tokenizer = kwargs.get("tokenizer", None)
+        if kwargs.get("tokenizer_class", None) is not None:
+            self.tokenizer_class = kwargs.get("tokenizer_class")
+        if kwargs.get("pattern", None) is not None:
+            self.pattern = kwargs.get("pattern")
+        if kwargs.get("special_tokens", None) is not None:
+            self.special_tokens = kwargs.get("special_tokens")
+    
+    @property
+    def backend_tokenizer(self):
+        return self._tokenizer
 
     @classmethod
     def from_pretrained(
         cls,
         pretrained_model_name_or_path: Union[str, os.PathLike],
-        *input_args,
         cache_dir: Optional[Union[str, os.PathLike]] = None,
         **kwargs,
     ):
-        subfolder = kwargs.get("subfolder", None)
-        instance = cls(*input_args)
+        subfolder = kwargs.get("subfolder", "")
         
-        pattern = instance.pattern
+        pattern = cls.pattern
         if pattern is None:
             pattern = kwargs.get("pattern", None)
-        special_tokens = instance.special_tokens
+        special_tokens = cls.special_tokens
         if special_tokens is None:
             special_tokens = kwargs.get("special_tokens", None)
         
-        if subfolder is not None:
+        if len(subfolder) > 0:
             pretrained_model_name_or_path = str(os.path.join(pretrained_model_name_or_path, subfolder))
         else:
             pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -52,12 +60,12 @@ class PreTrainedTokenizer(object):
             else:
                 raise ValueError(f"Cannot determine tokenizer class from {pretrained_model_name_or_path}, please specify `tokenizer_class`")
         
-        instance.tokenizer_class = tokenizer_class
+        kwargs.update({"tokenizer_class": tokenizer_class})
         
         if tokenizer_class == "hf":
             from .hf_tokenizer import HuggingFaceTokenizer
             
-            instance._tokenizer = HuggingFaceTokenizer.from_pretrained(pretrained_model_name_or_path, cache_dir=cache_dir, **kwargs)
+            _tokenizer = HuggingFaceTokenizer.from_pretrained(pretrained_model_name_or_path, cache_dir=cache_dir, **kwargs)
         elif tokenizer_class == "sentencepiece":
             from .sentencepiece_tokenizer import SentencePieceTokenizer
             
@@ -74,7 +82,7 @@ class PreTrainedTokenizer(object):
             else:
                 raise ValueError(f"Unknown pretrained_model_name_or_path {pretrained_model_name_or_path}")
 
-            instance._tokenizer = SentencePieceTokenizer(model_file, **kwargs)
+            _tokenizer = SentencePieceTokenizer(model_file, **kwargs)
         elif tokenizer_class == "tiktoken":
             from .tiktoken_tokenizer import TikTokenizer
             
@@ -91,19 +99,22 @@ class PreTrainedTokenizer(object):
             else:
                 raise ValueError(f"Unknown pretrained_model_name_or_path {pretrained_model_name_or_path}")
 
-            instance._tokenizer = TikTokenizer(model_file, pattern, special_tokens, **kwargs)
+            _tokenizer = TikTokenizer(model_file, pattern, special_tokens, **kwargs)
         elif tokenizer_class == "gpt2":
             from .gpt2_tokenizer import GPT2Tokenizer
             
-            instance._tokenizer = GPT2Tokenizer.from_pretrained(pretrained_model_name_or_path, cache_dir=cache_dir, **kwargs)
+            _tokenizer = GPT2Tokenizer.from_pretrained(pretrained_model_name_or_path, cache_dir=cache_dir, **kwargs)
         else:
             raise ValueError(f"Unknown tokenizer class {tokenizer_class}")
+        
+        instance = cls(_tokenizer, **kwargs)
         
         return instance
     
     def __getattr__(self, name):
-        if getattr(self, name) is not None:
-            return getattr(self, name)
+        self_attr = self.__dict__.get(name, None)
+        if self_attr is not None:
+            return self_attr
         attr = getattr(self._tokenizer, name)
         if attr is None:
             raise AttributeError(f"{self._tokenizer.__class__.__name__} object has no attribute '{name}'")

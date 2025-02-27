@@ -198,6 +198,7 @@ class PreTrainedModel(ht.nn.Module):
         # 2. 根据model_name_or_path判断是否从本地读取，以及是否为sharded存储（远端存储）
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
+        is_sharded = False
         if is_local:
             if use_safetensors and os.path.isfile(
                 os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant))
@@ -244,7 +245,10 @@ class PreTrainedModel(ht.nn.Module):
             raise NotImplementedError
         # 3. 如果是sharded存储，需要读取metadata和sharded文件名
         if is_sharded:
-            index_file = os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
+            if use_safetensors:
+                index_file = os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
+            else:
+                index_file = os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(TORCH_WEIGHTS_INDEX_NAME, variant))
             with open(index_file, "r") as f:
                 index = json.loads(f.read())
             shard_filenames = sorted(set(index["weight_map"].values()))
@@ -283,6 +287,7 @@ class PreTrainedModel(ht.nn.Module):
                         value.model_dtype = default_dtype
                     print(f"Model type is derived from model weights as {model_dtype}")
                 elif hasattr(ht, model_dtype):
+                    # TODO: fix bugs
                     model_dtype = getattr(ht, model_dtype)
                 for sub_config_key in config.sub_configs.keys():
                     sub_config = getattr(config, sub_config_key)

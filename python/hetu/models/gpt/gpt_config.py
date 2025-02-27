@@ -1,4 +1,4 @@
-from utils.config_utils import PreTrainedConfig
+from hetu.models.utils import PreTrainedConfig
 
 class GPTConfig(PreTrainedConfig):
     model_type = "gpt"

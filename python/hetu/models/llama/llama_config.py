@@ -1,4 +1,4 @@
-from utils.config_utils import PreTrainedConfig
+from hetu.models.utils import PreTrainedConfig
 
 class LlamaConfig(PreTrainedConfig):
     model_type = "llama"

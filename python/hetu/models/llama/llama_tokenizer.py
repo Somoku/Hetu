@@ -4,14 +4,24 @@ from hetu.datasets.tokenizers.tiktoken_tokenizer import PATTERN_TIKTOKEN_CL100K
 class LlamaTokenizer(PreTrainedTokenizer):
     tokenizer_class = "sentencepiece"
     
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        backend_tokenizer,
+        **kwargs,
+    ):
+        kwargs.update({"tokenizer": backend_tokenizer})
+        super().__init__(**kwargs)
 
 class Llama2Tokenizer(PreTrainedTokenizer):
     tokenizer_class = "sentencepiece"
     
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        backend_tokenizer,
+        **kwargs,
+    ):
+        kwargs.update({"tokenizer": backend_tokenizer})
+        super().__init__(**kwargs)
     
 
 class Llama3Tokenizer(PreTrainedTokenizer):
@@ -35,25 +45,29 @@ class Llama3Tokenizer(PreTrainedTokenizer):
         for i in range(5, NUM_RESERVED_SPECIAL_TOKENS - 5)
     ]
     
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        backend_tokenizer,
+        **kwargs,
+    ):
+        kwargs.update({"tokenizer": backend_tokenizer})
+        super().__init__(**kwargs)
 
         # Encode BOS and EOS, define pad ID
-        self.bos_id = self.special_tokens["<|begin_of_text|>"]
-        self.eos_id = self.special_tokens["<|end_of_text|>"]
-        self.pad_id = self.special_tokens["<|finetune_right_pad_id|>"]
-        self.step_id = self.special_tokens["<|step_id|>"]
+        self.bos_id = self.convert_tokens_to_ids("<|begin_of_text|>")
+        self.eos_id = self.convert_tokens_to_ids("<|end_of_text|>")
+        self.pad_id = self.convert_tokens_to_ids("<|finetune_right_pad_id|>")
+        self.step_id = self.convert_tokens_to_ids("<|step_id|>")
 
         # Encode extra special tokens
-        self.start_header_id = self.special_tokens["<|start_header_id|>"]
-        self.end_header_id = self.special_tokens["<|end_header_id|>"]
-        self.eot_id = self.special_tokens["<|eot_id|>"]
-
-        # Media tokens
-        self.image_id = self.special_tokens["<|image|>"]
+        self.start_header_id = self.convert_tokens_to_ids("<|start_header_id|>")
+        self.end_header_id = self.convert_tokens_to_ids("<|end_header_id|>")
+        self.eot_id = self.convert_tokens_to_ids("<|eot_id|>")
 
         # During generation, stop when either eos_id, eot_id, or eom_id is encountered
         self.stop_tokens = [self.eos_id, self.eot_id]
+        # TODO: refactor it to be more general
+        self._tokenizer.__setattr__("pad_token", "<|finetune_right_pad_id|>")
 
 
 __all__ = ["LlamaTokenizer", "Llama2Tokenizer", "Llama3Tokenizer"]

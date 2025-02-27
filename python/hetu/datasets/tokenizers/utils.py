@@ -1,7 +1,7 @@
 import hetu
 import numpy as np
 from abc import ABC, abstractmethod
-from enum import Enum, verify, EnumCheck
+from enum import Enum
 from typing import Any, Dict, List, Union, Iterable
 from hetu.utils.common_utils import to_py_obj
 
@@ -16,30 +16,48 @@ SPECIAL_TOKENS_ATTRIBUTE = {
     "additional_special_tokens",
 }
 
-@verify(EnumCheck.UNIQUE, EnumCheck.EXACT)
-class PaddingStrategy(Enum):
-    NO_PAD = "no_pad"
-    LONGEST = "longest"
-    MAX_LENGTH = "max_length"
-    
-    def __getattr__(self, name):
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+try:
+    from enum import verify, EnumCheck
+    @verify(EnumCheck.UNIQUE, EnumCheck.EXACT)
+    class PaddingStrategy(Enum):
+        NO_PAD = "no_pad"
+        LONGEST = "longest"
+        MAX_LENGTH = "max_length"
+        
+        def __getattr__(self, name):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-    @classmethod
-    def _missing_(cls, value):
-        raise ValueError(f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}")
+        @classmethod
+        def _missing_(cls, value):
+            raise ValueError(f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}")
 
-@verify(EnumCheck.UNIQUE, EnumCheck.EXACT)
-class TruncationStrategy(Enum):
-    NO_TRUNCATE = "no_truncate"
-    MAX_LENGTH = "longest_first"
+    @verify(EnumCheck.UNIQUE, EnumCheck.EXACT)
+    class TruncationStrategy(Enum):
+        NO_TRUNCATE = "no_truncate"
+        MAX_LENGTH = "longest_first"
+except ImportError:
+    class PaddingStrategy(Enum):
+        NO_PAD = "no_pad"
+        LONGEST = "longest"
+        MAX_LENGTH = "max_length"
+        
+        def __getattr__(self, name):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+        @classmethod
+        def _missing_(cls, value):
+            raise ValueError(f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}")
+
+    class TruncationStrategy(Enum):
+        NO_TRUNCATE = "no_truncate"
+        MAX_LENGTH = "longest_first"
 
 class SpecialToken(object):
     special_tokens_attribute = SPECIAL_TOKENS_ATTRIBUTE
     
     def __init__(self, **kwargs):
-        self.special_tokens_map = {attr: None for attr in SPECIAL_TOKENS_ATTRIBUTE}
-        self.special_tokens_map["additional_special_tokens"] = []
+        self._special_tokens_map = {attr: None for attr in SPECIAL_TOKENS_ATTRIBUTE}
+        self._special_tokens_map["additional_special_tokens"] = []
         
         for key, value in kwargs.items():
             if value is None:
@@ -66,8 +84,8 @@ class SpecialToken(object):
         if key_is_id and not key_without_id.endswith("_token"):
             key_without_id += "_token"
 
-        if self.__dict__.get("special_tokens_map", None) is not None and any(
-            name in self.__dict__["special_tokens_map"] for name in [key, key_without_id]
+        if self.__dict__.get("_special_tokens_map", None) is not None and any(
+            name in self.__dict__["_special_tokens_map"] for name in [key, key_without_id]
         ):
             if key_is_id:
                 if value is not None:
@@ -80,7 +98,7 @@ class SpecialToken(object):
 
             if key != "additional_special_tokens" and not isinstance(value, str) and value is not None:
                 raise ValueError(f"Cannot set a non-string value as the {key}")
-            self.special_tokens_map[key] = value
+            self._special_tokens_map[key] = value
         else:
             super().__setattr__(key, value)
     
@@ -94,10 +112,10 @@ class SpecialToken(object):
         if key_is_id and not key_without_id.endswith("_token"):
             key_without_id += "_token"
 
-        if self.__dict__.get("special_tokens_map", None) is not None and any(
-            name in self.__dict__["special_tokens_map"] for name in [key, key_without_id]
+        if self.__dict__.get("_special_tokens_map", None) is not None and any(
+            name in self.__dict__["_special_tokens_map"] for name in [key, key_without_id]
         ):
-            _special_tokens_map = self.__dict__["special_tokens_map"]
+            _special_tokens_map = self.__dict__["_special_tokens_map"]
             if not key_is_id:
                 if _special_tokens_map[key] is None:
                     return None
@@ -106,10 +124,10 @@ class SpecialToken(object):
             else:
                 attr_as_tokens = getattr(self, key_without_id)
                 return self.convert_tokens_to_ids(attr_as_tokens) if attr_as_tokens is not None else None
-        elif self.__dict__.get("special_tokens_map", None) is not None and any(
-            name in self.__dict__["special_tokens_map"]["additional_special_tokens"] for name in [key, key_without_id]
+        elif self.__dict__.get("_special_tokens_map", None) is not None and any(
+            name in self.__dict__["_special_tokens_map"]["additional_special_tokens"] for name in [key, key_without_id]
         ):
-            _additional_special_tokens = self.__dict__["special_tokens_map"]["additional_special_tokens"]
+            _additional_special_tokens = self.__dict__["_special_tokens_map"]["additional_special_tokens"]
             if key_is_id:
                 for token in _additional_special_tokens:
                     if token == key_without_id:
@@ -122,11 +140,49 @@ class SpecialToken(object):
         else:
             return super().__getattr__(key)
     
+    def add_special_tokens(
+        self, special_tokens_dict: Dict[str, str], override_additional_special_tokens=True
+    ) -> int:
+        if not special_tokens_dict:
+            return 0
+        
+        added_tokens = []
+        for key, value in special_tokens_dict.items():
+            assert key in self.special_tokens_attribute, \
+            f"Key {key} is not a special token. If you want to add a new special token,"
+            " please set key to 'additional_special_tokens' and provide a list of str or AddedToken"
+
+            if key == "additional_special_tokens":
+                assert isinstance(value, (list, tuple)) and all(
+                    isinstance(t, str) for t in value
+                ), f"Tokens {value} for key {key} should all be str or AddedToken instances"
+
+                to_add = []
+                for token in value:
+                    if not override_additional_special_tokens and str(token) in self.additional_special_tokens:
+                        continue
+                    to_add.append(token)
+                if override_additional_special_tokens and len(to_add) > 0:
+                    setattr(self, key, list(to_add))
+                else:
+                    self._special_tokens_map["additional_special_tokens"].extend(to_add)
+                added_tokens += to_add
+            else:
+                if not isinstance(value, str):
+                    raise ValueError(f"Token {value} for key {key} should be a str")
+                if getattr(self, key) is None:
+                    raise ValueError(f"Only support setting keys in `SPECIAL_TOKENS_ATTRIBUTE`, but got {key}")
+                setattr(self, key, value)
+                if value not in added_tokens:
+                    added_tokens.append(value)
+
+        return len(added_tokens)
+    
     def convert_tokens_to_ids(self, tokens: Union[str, Iterable[str]]) -> Union[int, List[int]]:
         raise NotImplementedError
 
 class BaseTokenizer(ABC):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
     
     @abstractmethod

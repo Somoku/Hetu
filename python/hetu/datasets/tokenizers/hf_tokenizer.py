@@ -15,14 +15,13 @@ CHAT_TEMPLATE_FILE = "chat_template.jinja"
 TOKENIZER_FILE = "tokenizer.json"
 
 # Copied from Transformers `tokenization_utils_base.py`
-class HuggingFaceSpecialToken(object):
+class HuggingFaceSpecialToken:
     special_tokens_attribute = SPECIAL_TOKENS_ATTRIBUTE
-    
+
     def __init__(self, **kwargs):
-        super().__init__()
         self.pad_token_type_id = 0
-        self.special_tokens_map = {attr: None for attr in self.special_tokens_attribute}
-        self.special_tokens_map["additional_special_tokens"] = []
+        self._special_tokens_map = {attr: None for attr in self.special_tokens_attribute}
+        self._special_tokens_map["additional_special_tokens"] = []
         
         for key, value in kwargs.items():
             if value is None:
@@ -39,7 +38,6 @@ class HuggingFaceSpecialToken(object):
                 else:
                     raise TypeError(f"Special token {key} has to be either str or AddedToken but got: {type(value)}")
 
-    @property
     def add_special_tokens(
         self, special_tokens_dict: Dict[str, Union[str, AddedToken]], override_additional_special_tokens=True
     ) -> int:
@@ -68,7 +66,7 @@ class HuggingFaceSpecialToken(object):
                 if override_additional_special_tokens and len(to_add) > 0:
                     setattr(self, key, list(to_add))
                 else:
-                    self.special_tokens_map["additional_special_tokens"].extend(to_add)
+                    self._special_tokens_map["additional_special_tokens"].extend(to_add)
                 added_tokens += to_add
             else:
                 if not isinstance(value, (str, AddedToken)):
@@ -105,8 +103,8 @@ class HuggingFaceSpecialToken(object):
         if key_is_id:
             key_without_id = key[:-3] if not key.endswith("_ids") else key[:-4]
 
-        if self.__dict__.get("special_tokens_map", None) is not None and any(
-            name in self.__dict__["special_tokens_map"] for name in [key, key_without_id]
+        if self.__dict__.get("_special_tokens_map", None) is not None and any(
+            name in self.__dict__["_special_tokens_map"] for name in [key, key_without_id]
         ):
             if key_is_id:
                 if value is not None:
@@ -119,7 +117,7 @@ class HuggingFaceSpecialToken(object):
 
             if key != "additional_special_tokens" and not isinstance(value, (str, AddedToken)) and value is not None:
                 raise ValueError(f"Cannot set a non-string value as the {key}")
-            self.special_tokens_map[key] = value
+            self._special_tokens_map[key] = value
         else:
             super().__setattr__(key, value)
 
@@ -130,10 +128,10 @@ class HuggingFaceSpecialToken(object):
         if key_is_id:
             key_without_id = key[:-3] if not key.endswith("_ids") else key[:-4]
 
-        if self.__dict__.get("special_tokens_map", None) is not None and any(
-            name in self.__dict__["special_tokens_map"] for name in [key, key_without_id]
+        if self.__dict__.get("_special_tokens_map", None) is not None and any(
+            name in self.__dict__["_special_tokens_map"] for name in [key, key_without_id]
         ):
-            _special_tokens_map = self.__dict__["special_tokens_map"]
+            _special_tokens_map = self.__dict__["_special_tokens_map"]
             if not key_is_id:
                 if _special_tokens_map[key] is None:
                     return None
@@ -142,10 +140,10 @@ class HuggingFaceSpecialToken(object):
             else:
                 attr_as_tokens = getattr(self, key_without_id)
                 return self.convert_tokens_to_ids(attr_as_tokens) if attr_as_tokens is not None else None
-        elif self.__dict__.get("special_tokens_map", None) is not None and any(
-            name in self.__dict__["special_tokens_map"]["additional_special_tokens"] for name in [key, key_without_id]
+        elif self.__dict__.get("_special_tokens_map", None) is not None and any(
+            name in self.__dict__["_special_tokens_map"]["additional_special_tokens"] for name in [key, key_without_id]
         ):
-            _additional_special_tokens = self.__dict__["special_tokens_map"]["additional_special_tokens"]
+            _additional_special_tokens = self.__dict__["_special_tokens_map"]["additional_special_tokens"]
             if key_is_id:
                 for token in _additional_special_tokens:
                     if token == key_without_id:
@@ -171,7 +169,7 @@ class HuggingFaceSpecialToken(object):
     def special_tokens_map_extended(self) -> Dict[str, Union[str, AddedToken, List[Union[str, AddedToken]]]]:
         set_attr = {}
         for attr in self.special_tokens_attribute:
-            attr_value = self.special_tokens_map[attr]
+            attr_value = self._special_tokens_map[attr]
             if attr_value:
                 set_attr[attr] = attr_value
         return set_attr
@@ -212,14 +210,14 @@ class HuggingFaceSpecialToken(object):
         raise NotImplementedError
 
     def _add_model_specific_special_tokens(self, special_tokens):
-        self.special_tokens_attribute += list(special_tokens.keys())
+        self.special_tokens_attribute.update(set(special_tokens.keys()))
         for key, value in special_tokens.items():
             if isinstance(value, (str, AddedToken)):
                 self.special_tokens_map[key] = value
             else:
                 raise TypeError(f"Special token {key} has to be either str or AddedToken but got: {type(value)}")
 
-class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
+class HuggingFaceTokenizer(HuggingFaceSpecialToken, BaseTokenizer):
     # load from Tokenizer (fast version)
     
     vocab_files_names: Dict[str, str] = {"tokenizer_file": TOKENIZER_FILE}
@@ -228,6 +226,7 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
     truncation_side: str = "right"
     
     def __init__(self, *args, **kwargs):
+        super().__init__(**kwargs)
         tokenizer_object = kwargs.pop("tokenizer_object", None)
         tokenizer_file = kwargs.pop("tokenizer_file", None)
         added_tokens_decoder = kwargs.pop("added_tokens_decoder", {})
@@ -262,7 +261,6 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
         else:
             self._tokenizer.no_padding()
 
-        super().__init__(**kwargs)
         for key in kwargs:
             if hasattr(self, key) and callable(getattr(self, key)):
                 raise AttributeError(f"{key} conflicts with the method {key} in {self.__class__.__name__}")
@@ -297,7 +295,7 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
         
         self.extra_special_tokens = kwargs.pop("extra_special_tokens", {})
         self._add_model_specific_special_tokens(special_tokens=self.extra_special_tokens)
-        
+
         # add special tokens
         self._tokenizer.encode_special_tokens = self.split_special_tokens
         added_tokens_decoder_hash = {hash(repr(token)) for token in self.added_tokens_decoder}
@@ -329,12 +327,13 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
             if tokens:
                 self.add_tokens(tokens)
 
-        pre_tok_state = json.loads(self._tokenizer.pre_tokenizer.__getstate__())
-        if pre_tok_state.get("add_prefix_space", self.add_prefix_space) != self.add_prefix_space:
-            pre_tok_class = getattr(pre_tokenizers, pre_tok_state.pop("type"))
-            pre_tok_state["add_prefix_space"] = self.add_prefix_space
-            self._tokenizer.pre_tokenizer = pre_tok_class(**pre_tok_state)
-    
+        if self._tokenizer.pre_tokenizer is not None:
+            pre_tok_state = json.loads(self._tokenizer.pre_tokenizer.__getstate__())
+            if pre_tok_state.get("add_prefix_space", self.add_prefix_space) != self.add_prefix_space:
+                pre_tok_class = getattr(pre_tokenizers, pre_tok_state.pop("type"))
+                pre_tok_state["add_prefix_space"] = self.add_prefix_space
+                self._tokenizer.pre_tokenizer = pre_tok_class(**pre_tok_state)
+
     @property
     def vocab_size(self) -> int:
         return self._tokenizer.get_vocab_size(with_added_tokens=False)
@@ -345,14 +344,14 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
     @property
     def vocab(self) -> Dict[str, int]:
         return self.get_vocab()
+    
+    @property
+    def added_tokens_decoder(self) -> Dict[int, AddedToken]:
+        return self._tokenizer.get_added_tokens_decoder()
 
     @property
     def added_tokens_encoder(self) -> Dict[str, int]:
         return {token.content: id for id, token in sorted(self.added_tokens_decoder.items(), key=lambda item: item[0])}
-
-    @property
-    def added_tokens_decoder(self) -> Dict[int, AddedToken]:
-        return self._tokenizer.get_added_tokens_decoder()
     
     def __len__(self) -> int:
         return self._tokenizer.get_vocab_size(with_added_tokens=True)
@@ -429,7 +428,7 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
         cache_dir: Optional[Union[str, os.PathLike]] = None,
         **kwargs,
     ):
-        subfolder = kwargs.pop("subfolder", None)
+        subfolder = kwargs.pop("subfolder", "")
         
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         vocab_files = {}
@@ -506,6 +505,7 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
                 init_kwargs[args_name] = file_path
         
         init_kwargs["name_or_path"] = pretrained_model_name_or_path
+        init_kwargs["tokenizer_file"] = tokenizer_file
         
         # Handle tokenizer serialization of added and special tokens
         added_tokens_decoder: Dict[int, AddedToken] = {}
@@ -689,7 +689,10 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
         max_length = kwargs.get("max_length", None)
         split_special_tokens = kwargs.get("split_special_tokens", self.split_special_tokens)
         
-        batched_input = [text]
+        if isinstance(text, str):
+            batched_input = [text]
+        else:
+            batched_input = text
         if self._tokenizer.encode_special_tokens != split_special_tokens:
             self._tokenizer.encode_special_tokens = split_special_tokens
         
@@ -741,7 +744,6 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
             truncation=truncation,
             max_length=max_length,
             pad_to_multiple_of=pad_to_multiple_of,
-            padding_side=self.padding_side,
         )
         
         old_padding, old_truncation = self.set_padding_and_truncation_strategy(
@@ -753,8 +755,10 @@ class HuggingFaceTokenizer(BaseTokenizer, HuggingFaceSpecialToken):
             add_special_tokens=add_special_tokens,
         )
         
-        self._tokenizer.enable_padding(**old_padding)
-        self._tokenizer.enable_truncation(**old_truncation)
+        if old_padding is not None:
+            self._tokenizer.enable_padding(**old_padding)
+        if old_truncation is not None:
+            self._tokenizer.enable_truncation(**old_truncation)
         
         return encodings
         

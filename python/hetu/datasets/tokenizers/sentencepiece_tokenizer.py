@@ -1,7 +1,7 @@
 from .utils import BaseTokenizer, SpecialToken
 from typing import Dict, Any, List, Union, Iterable
 
-WHITESPACE_CHARS = set(" ", "\n", "\t", "\r", "\v")
+WHITESPACE_CHARS = {" ", "\n", "\t", "\r", "\v"}
 
 class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
     def __init__(self, model_file, vocab_extra_ids=0, **kwargs):
@@ -13,40 +13,62 @@ class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
         self._initialize_special_tokens(vocab_extra_ids)
     
     def _initialize_special_tokens(self, vocab_extra_ids):
-        self.bos_id = self.tokenizer.bos_id()
-        try:
-            bos_token = self.tokenizer.id_to_piece(self.bos_id)
-        except IndexError:
-            bos_token = '<BOS>'
-        self.special_tokens_map["bos_token"] = bos_token
-
-        self.eos_id = self.tokenizer.eos_id()
-        try:
-            eos_token = self.tokenizer.id_to_piece(self.eos_id)
-        except IndexError:
-            eos_token = '<EOS>'
-        self.special_tokens_map["eos_token"] = eos_token
-        
-        self.pad_id = self.tokenizer.pad_id()
-        try:
-            pad_token = self.tokenizer.id_to_piece(self.pad_id)
-        except IndexError:
-            pad_token = '<PAD>'
-        self.special_tokens_map["pad_token"] = pad_token
-        
-        self.unk_id = self.tokenizer.unk_id()
-        try:
-            unk_token = self.tokenizer.id_to_piece(self.unk_id)
-        except IndexError:
-            unk_token = '<UNK>'
-        self.special_tokens_map["unk_token"] = unk_token
-        
         # add additional special tokens to special vocab
         self.special_vocab = {}
         self.inv_special_vocab = {}
         next_id = self.tokenizer.vocab_size()
-        if self.special_tokens_map["additional_special_tokens"] is not None:
-            for t in self.special_tokens_map["additional_special_tokens"]:
+
+        try:
+            self.bos_id = self.tokenizer.bos_id()
+            bos_token = self.tokenizer.id_to_piece(self.bos_id)
+        except IndexError:
+            bos_token = '<BOS>'
+            self.bos_id = next_id
+            self.special_vocab[bos_token] = next_id
+            self.inv_special_vocab[next_id] = bos_token
+            next_id += 1
+
+        if not self.tokenizer.eos_id() == -1:
+            self.eos_id = self.tokenizer.eos_id()
+            eos_token = self.tokenizer.id_to_piece(self.eos_id)
+        else:
+            eos_token = '<EOS>'
+            self.special_vocab[eos_token] = next_id
+            self.inv_special_vocab[next_id] = eos_token
+            self.eos_id = next_id
+            next_id += 1
+        
+        if not self.tokenizer.pad_id() == -1:
+            self.pad_id = self.tokenizer.pad_id()
+            pad_token = self.tokenizer.id_to_piece(self.pad_id)
+        else:
+            pad_token = '<PAD>'
+            self.special_vocab[pad_token] = next_id
+            self.inv_special_vocab[next_id] = pad_token
+            self.pad_id = next_id
+            next_id += 1
+        
+        if not self.tokenizer.unk_id() == -1:
+            self.unk_id = self.tokenizer.unk_id()
+            unk_token = self.tokenizer.id_to_piece(self.unk_id)
+        else:
+            unk_token = '<UNK>'
+            self.special_vocab[unk_token] = next_id
+            self.inv_special_vocab[next_id] = unk_token
+            self.unk_id = next_id
+            next_id += 1
+        
+        special_tokens_dict = {
+            "bos_token": bos_token,
+            "eos_token": eos_token,
+            "unk_token": unk_token,
+            "pad_token": pad_token,
+        }
+        
+        self.add_special_tokens(special_tokens_dict)
+        
+        if self._special_tokens_map["additional_special_tokens"] is not None:
+            for t in self._special_tokens_map["additional_special_tokens"]:
                 self.special_vocab[t] = next_id
                 self.inv_special_vocab[next_id] = t
                 next_id += 1
@@ -59,7 +81,7 @@ class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
             self.inv_special_vocab[next_id] = t
             next_id += 1
             
-        self.special_tokens_map["additional_special_tokens"].extend(additional_special_tokens)
+        self._special_tokens_map["additional_special_tokens"].extend(additional_special_tokens)
         
         self.encodes_whitespace = any(
             [self.tokenizer.encode(c) for c in WHITESPACE_CHARS]
@@ -67,7 +89,7 @@ class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
     
     def encode(self, text: str, **kwargs: Dict[str, Any]) -> List[int]:
         add_bos = kwargs.pop("add_bos", True)
-        add_eos = kwargs.pop("add_eos", True)
+        add_eos = kwargs.pop("add_eos", False)
         trim_leading_whitespace = kwargs.pop("trim_leading_whitespace", False)
         prefix = kwargs.pop("prefix", None)
         
@@ -81,7 +103,7 @@ class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
         else:
             return self._inner_encode(text, add_bos, add_eos)
     
-    def _inner_encode(self, text: str, add_bos: bool = True, add_eos: bool = True) -> List[int]:
+    def _inner_encode(self, text: str, add_bos: bool = True, add_eos: bool = False) -> List[int]:
         if self.special_vocab is None:
             return self.tokenizer.encode(
                 text,
@@ -111,6 +133,10 @@ class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
                 idx = next_idx + len(next_token)
 
             ids.extend(self.tokenizer.encode_as_ids(text[idx:]))
+            if add_bos:
+                ids = [self.bos_id] + ids
+            if add_eos:
+                ids.append(self.eos_id)
             return ids
 
     def _decode(
@@ -136,10 +162,22 @@ class SentencePieceTokenizer(BaseTokenizer, SpecialToken):
             return text
 
     def convert_ids_to_tokens(self, ids: Union[int, List[int]]) -> Union[str, List[str]]:
-        return self.tokenizer.id_to_piece(ids)
+        try:
+            return self.tokenizer.id_to_piece(ids)
+        except:
+            if isinstance(ids, int):
+                return self.inv_special_vocab[ids]
+            else:
+                return [self.inv_special_vocab[id] for id in ids]
     
     def convert_tokens_to_ids(self, tokens: Union[str, Iterable[str]]) -> Union[int, List[int]]:
-        return self.tokenizer.piece_to_id(tokens)
+        try:
+            return self.tokenizer.piece_to_id(tokens)
+        except:
+            if isinstance(tokens, str):
+                return self.special_vocab[tokens]
+            else:
+                return [self.special_vocab[t]for t in tokens]
     
     @property
     def vocab_size(self) -> int:
