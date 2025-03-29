@@ -51,7 +51,7 @@ def pssh(args):
         # 请注意log编号目前并不等于rank编号
         # log编号是进程编号
         # 但不能保证分配到同样编号的rank
-        cmd_list.append(cmd + f"export HETU_LOCAL_HOSTNAME={hostname} && " + train_command + f" 2>&1 | tee {args.log_path}" + "/log_" + f"{i}" + ".txt")
+        cmd_list.append(cmd + f"export HETU_LOCAL_HOSTNAME={hostname} && " + train_command + f" 2>&1 | tee {args.log_path}" + "/log_" + f"{i}" + ".log")
     clients = []
     outputs = []
     for hostname, port, password, cmd in zip(hostnames, ports, passwords, cmd_list):
