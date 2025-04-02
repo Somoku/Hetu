@@ -424,6 +424,7 @@ void DefineAndRunGraph::DeduceShapePlan(ExecGraphPlan& exec_graph_plan,
   // 需要再进行一次额外的推导
   CUR_STRATEGY_ID = COMPUTE_STRATEGY_ID;
   exec_graph_plan.exec_graph->CUR_STRATEGY_ID = COMPUTE_STRATEGY_ID;
+  exec_graph_plan.exec_graph->TopoSortExecTensors();
   for (const auto& exec_tensor : exec_graph_plan.exec_graph->_record_exec_tensors) {
     auto& exec_op = exec_tensor->producer();
     HTShapeList exec_input_shapes;
@@ -1358,6 +1359,7 @@ NDArrayList DefineAndRunGraph::Run(const Tensor& loss, const TensorList& fetches
   // 方便后面的热切换
   if (exec_graph->NeedRank(hetu::impl::comm::DeviceToWorldRank(local_device))) {
     Graph::push_graph_ctx(exec_graph->id()); // 防止exec graph run内部MakeOp时忘记加
+    SetMicroBatchCtx(0, int_symbol_dict); // 为了保证exec graph内各pass用的是第一个micro batch
     exec_graph->Run(exec_loss, exec_fetches, 
                     exec_feed_dict, int_symbol_dict, num_micro_batches, 
                     RunLevel::TOPO, grad_scale);

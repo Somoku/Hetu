@@ -18,7 +18,7 @@ _member_t = Union[Optional[Parameter], Optional['Module'], Optional[Tensor]]
 def parallel_data_provider(global_data, ds_union, dg_union, local_device):
     device_group_index, device_group = get_dg_from_union(local_device, dg_union)
     device_index = device_group.get_index(local_device)
-    ds = ds_union.get_local(device_group_index)
+    ds = ds_union.get(device_group_index)
     if ds.zero:
         local_map = hetu.map_to_local_data(ds, device_index)
         local_map[0] = local_map.get(0, 0) * ds.states.get(-1, 1) + local_map.get(-1, 0)

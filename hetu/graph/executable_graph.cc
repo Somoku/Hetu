@@ -1698,7 +1698,6 @@ NDArrayList ExecutableGraph::Run(const Tensor& loss, const TensorList& fetches,
       Instantiate(fetches, local_device);
       HT_LOG_DEBUG << local_device << ": [Execution Plan] Instantiate end...";
 
-      /*
       // init instantiated topo
       OpRefList topo_before_recompute = Graph::TopoSort(fetches, num_ops(), is_op_computed);
       HT_LOG_DEBUG << local_device << ": global topo before recompute pass: " << topo_before_recompute;
@@ -1721,7 +1720,6 @@ NDArrayList ExecutableGraph::Run(const Tensor& loss, const TensorList& fetches,
       ActivationCPUOffload::OffloadToCPU(topo_before_activation_offload);
       Graph::pop_graph_ctx();
       HT_LOG_INFO << local_device << ": [Execution Plan] activation offload pass end...";
-      */
 
       // init topo contains comm_op
       OpRefList topo_before_substitute_comm = Graph::TopoSort(fetches, num_ops(), is_op_computed);

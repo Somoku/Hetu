@@ -603,10 +603,9 @@ class Trainer:
             seqlen_list = bucket.cp_packed_seqlen_list()
                 
             # 设置symbol
-            if self.pretrain_config.packing:
-                for enum_cp_id, enum_pipeline_id in enumerate(range(sum(cp_list[:dp_group_id]), sum(cp_list[:dp_group_id+1]))):
-                    enum_symbol = self.model.config.multi_seq_lens_symbol[strategy_id][enum_pipeline_id]
-                    int_symbol_dict[enum_symbol] = seqlen_list[enum_cp_id]
+            for enum_cp_id, enum_pipeline_id in enumerate(range(sum(cp_list[:dp_group_id]), sum(cp_list[:dp_group_id+1]))):
+                enum_symbol = self.model.config.multi_seq_lens_symbol[strategy_id][enum_pipeline_id]
+                int_symbol_dict[enum_symbol] = seqlen_list[enum_cp_id]
             '''
             # 每个cp idx为0的负责把该cp的seqlen_list放到kv store中
             if cp_id == 0:
